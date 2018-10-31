@@ -1,3 +1,7 @@
+# Trabalho RIP
+# Breno Vinicius de Oliveira Viana - 726498
+# Bruno Morii Borges - 726500
+
 import socket
 import sys
 import threading
