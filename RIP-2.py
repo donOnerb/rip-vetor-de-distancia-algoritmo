@@ -16,12 +16,19 @@ sock.bind(server_address)
 
 sourceid = int(sys.argv[1]) # identificador do nó
 neighborhood = [] # vetor vizinhança
+cost = [] #tabela fixa de custo
 mincost = [] # tabela
-nexth = []
+nexth = [] #next hop
+change = 0
 
 
 def printaTabela(sourceid, mincost, nexth):
-	print ("Tabela do nó %d  \n\t  0 1 2 3 \n\t  %d %d %d %d\n next_h %d %d %d %d" % (sourceid, mincost[0], mincost[1], mincost[2], mincost[3], nexth[0], nexth[1], nexth[2], nexth[3]))
+	print ("\n**********Tabela do nó %d**********\n" %(sourceid))
+	print ("Para nó 0 | %d | Através de %d" %(mincost[0], nexth[0]) )
+	print ("Para nó 1 | %d | Através de %d" %(mincost[1], nexth[1]) )
+	print ("Para nó 2 | %d | Através de %d" %(mincost[2], nexth[2]) )
+	print ("Para nó 3 | %d | Através de %d" %(mincost[3], nexth[3]) )
+	print ("\n***********************************\n")
 
 class Rtpkt:
 	sourceid = -1 #identificador do nó
@@ -55,30 +62,31 @@ class Rtpkt:
 	
 
 def send_table():
-	global mincost
+	global mincost, change
 	sent = 0
-	changeLocal = 1
 	mincostL = [999, 999, 999, 999]
+	changeL = -1
 	while True:
-		while mincostL != mincost:
+		while changeL < change:
 			mincostL = mincost
-		#rotina de transmissão de tabela
+			changeL+=1
+			#rotina de transmissão de tabela
 			for x in neighborhood:
 				#variavel a é inicializada com um objeto rtpkt em cada ciclo
 				a = Rtpkt(sourceid, x, mincost)
 				#é mandado a tabela para o vizinho
 				print ("Enviando para o nó %d" %(x))
 				while(sent == 0):
-					print (sent)
+					#print (sent)
 					sent = sock.sendto((a.convertString()).encode(), ('127.0.0.1', 10000 + x))
 				sent = 0
-				time.sleep(random.random()*5) 
+				time.sleep(random.random()*5)
 		time.sleep(random.random()*5)
 		
 
 
 def rtupdate():
-	global mincost
+	global mincost, nexth, change, cost
 	#flag para verificar se algo na tabela mudou ou não
 	mincostL = [999, 999, 999, 999]
 	printaTabela(sourceid, mincost, nexth)
@@ -90,7 +98,6 @@ def rtupdate():
 		rcvdpkt = Rtpkt(-1, -1, [999, 999, 999, 999])
 		rcvdpkt = rcvdpkt.messageforRtpkt(sock.recv(1024).decode())
 		print("Tabela Recebida")
-		print(rcvdpkt.convertString())
 		#pega a tabela e o id do nó destino
 		mincostM = rcvdpkt.get_mincost()
 		sourceidM = rcvdpkt.get_sourceid()
@@ -98,42 +105,49 @@ def rtupdate():
 		#compara se tem algum caminho mais rápido, se tiver seta na tabela
 		#print (destid)
 		for x in range(0,4):
-			if (mincostM[x] + mincost[sourceidM]) < mincost[x] and x != sourceidM:
-				mincostL[x] = mincostM[x] + mincost[sourceidM]
+			if (mincostM[x] + cost[sourceidM]) < mincost[x] and x != sourceidM:
+				print("Tabela atualizada. Para roteador %d de [ %d | %d ] para [ %d | %d ]" %(x, mincost[x], nexth[x], mincostM[x] + cost[sourceidM], sourceidM))
+				#print(rcvdpkt.convertString())
+				#print("%d %d" %(mincostM[x], cost[sourceidM]))
+				#print(cost)
+				mincostL[x] = mincostM[x] + cost[sourceidM]
 				changeLocal = 1
 				nexth[x] = sourceidM
 		#se teve alteração é mandado a tabela para os vizinhos
 		if changeLocal == 1:
 			mincost = mincostL
-			printaTabela(sourceid, mincost, nexth)
 			time.sleep(random.random()*5)
-		
-
+			change+=1
+		printaTabela(sourceid, mincost, nexth)
 
 
 
 def main(sourceidR):
-	global sourceid, neighborhood, mincost, nexth
+	global sourceid, neighborhood, mincost, nexth, cost
 	#rotina principal, adicionamento de threads
 	if sourceidR == 0:
 		sourceid = 0
 		neighborhood  = [1, 2, 3] 
 		mincost = [0, 1, 3, 7]
+		cost = [0, 1, 3, 7]
 		nexth = [0, 1, 2, 3]
 	elif sourceidR == 1:
 		sourceid = 1
 		neighborhood  = [0, 2] 
 		mincost = [1, 0, 1, 999]
+		cost = [1, 0, 1, 999]
 		nexth = [0, 1, 2, -1]
 	elif sourceidR == 2:
 		sourceid = 2
 		neighborhood  = [0, 1, 3] 
 		mincost = [3, 1, 0, 2]
+		cost = [3, 1, 0, 2]
 		nexth = [0, 1, 2, 3]
 	elif sourceidR == 3:
 		sourceid = 3
 		neighborhood  = [0, 2] 
 		mincost = [7, 999, 2, 0]
+		cost = [7, 999, 2, 0]
 		nexth = [0, -1, 2, 3]
 
 	t_sender = threading.Thread(target=send_table, args=())
